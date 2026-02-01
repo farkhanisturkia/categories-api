@@ -43,15 +43,32 @@ func (repo *ProductRepository) Create(product *models.Product) error {
 
 // GetByID - ambil produk by ID
 func (repo *ProductRepository) GetByID(id int) (*models.Product, error) {
-	query := "SELECT id, name, price, stock FROM products WHERE id = $1"
+	query := `
+		SELECT 
+			p.id, p.name, p.price, p.stock, p.category_id,
+			c.name AS category_name
+		FROM products p
+		LEFT JOIN categories c ON p.category_id = c.id
+		WHERE p.id = $1
+	`
 
 	var p models.Product
-	err := repo.db.QueryRow(query, id).Scan(&p.ID, &p.Name, &p.Price, &p.Stock)
+	var categoryName sql.NullString
+
+	err := repo.db.QueryRow(query, id).Scan(
+		&p.ID, &p.Name, &p.Price, &p.Stock, &p.CategoryID,
+		&categoryName,
+	)
+
 	if err == sql.ErrNoRows {
 		return nil, errors.New("produk tidak ditemukan")
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	if categoryName.Valid {
+		p.Category = &models.Category{Name: categoryName.String}
 	}
 
 	return &p, nil
