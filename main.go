@@ -6,7 +6,20 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"os"
+	"log"
+	"categories-api/database"
+	"categories-api/repositories"
+	"categories-api/services"
+	"categories-api/handlers"
+
+	"github.com/spf13/viper"
 )
+
+type Config struct {
+	Port    string `mapstructure:"PORT"`
+	DBConn	string `mapstructure:"DB_CONN"`
+}
 
 type Category struct {
 	ID		int	`json:"id"`
@@ -20,6 +33,45 @@ var categories = []Category{
 }
 
 func main() {
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	if _, err := os.Stat(".env"); err == nil {
+		viper.SetConfigFile(".env")
+		_ = viper.ReadInConfig()
+	}
+
+	config := Config{
+		Port: viper.GetString("PORT"),
+		DBConn: viper.GetString("DB_CONN"),
+	}
+
+	db, err := database.InitDB(config.DBConn)
+	if err != nil {
+		log.Fatal("Failed to initialize database:", err)
+	}
+	defer db.Close()
+
+
+
+	productRepo := repositories.NewProductRepository(db)
+	productService := services.NewProductService(productRepo)
+	productHandler := handlers.NewProductHandler(productService)
+
+
+
+	http.HandleFunc("/api/produk", productHandler.HandleProducts)
+	http.HandleFunc("/api/produk/", productHandler.HandleProductByID)
+
+
+
+
+
+
+
+
+
+
 	http.HandleFunc("/api/categories/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" {
 			getCategoryByID(w, r)
@@ -60,12 +112,13 @@ func main() {
 		})
 	})
 
-	fmt.Println("Server running on localhost:8080")
+	addr := "0.0.0.0:" + config.Port
+	fmt.Println("Server running di", addr)
 
-	err := http.ListenAndServe(":8080", nil)
+	err = http.ListenAndServe(addr, nil)
 	if err != nil {
-		fmt.Println("running server is failed")
-	}	
+		fmt.Println("gagal running server", err)
+	}
 }
 
 func getCategoryByID(w http.ResponseWriter, r *http.Request) {
