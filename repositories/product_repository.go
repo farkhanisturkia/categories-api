@@ -67,7 +67,7 @@ func (repo *ProductRepository) GetByID(id int) (*models.Product, error) {
 	}
 
 	if categoryName.Valid {
-		p.Category = &models.Category{ID: &p.category_id, Name: categoryName.String}
+		p.Category = {Name: categoryName.String}
 	}
 
 	return &p, nil
