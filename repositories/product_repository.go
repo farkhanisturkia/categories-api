@@ -25,7 +25,7 @@ func (repo *ProductRepository) GetAll() ([]models.Product, error) {
 	products := make([]models.Product, 0)
 	for rows.Next() {
 		var p models.Product
-		err := rows.Scan(&p.ID, &p.Name, &p.Price, &p.Stock)
+		err := rows.Scan(&p.ID, &p.Name, &p.Price, &p.Stock, &p.CategoryID)
 		if err != nil {
 			return nil, err
 		}
@@ -45,7 +45,7 @@ func (repo *ProductRepository) Create(product *models.Product) error {
 func (repo *ProductRepository) GetByID(id int) (*models.Product, error) {
 	query := `
 		SELECT 
-			p.id, p.name, p.price, p.stock, p.category_id,
+			p.id, p.name, p.price, p.stock,
 			c.name AS category_name
 		FROM products p
 		LEFT JOIN categories c ON p.category_id = c.id
@@ -56,8 +56,7 @@ func (repo *ProductRepository) GetByID(id int) (*models.Product, error) {
 	var categoryName sql.NullString
 
 	err := repo.db.QueryRow(query, id).Scan(
-		&p.ID, &p.Name, &p.Price, &p.Stock, &p.CategoryID,
-		&categoryName,
+		&p.ID, &p.Name, &p.Price, &p.Stock, &categoryName,
 	)
 
 	if err == sql.ErrNoRows {
@@ -68,7 +67,7 @@ func (repo *ProductRepository) GetByID(id int) (*models.Product, error) {
 	}
 
 	if categoryName.Valid {
-		p.Category = &models.Category{Name: categoryName.String}
+		p.Category = &models.Category{ID: p.category_id, Name: categoryName.String}
 	}
 
 	return &p, nil
