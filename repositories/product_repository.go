@@ -45,18 +45,29 @@ func (repo *ProductRepository) Create(product *models.Product) error {
 func (repo *ProductRepository) GetByID(id int) (*models.Product, error) {
 	query := `
 		SELECT 
-			p.id, p.name, p.price, p.stock,
-			c.name AS category_name
+			p.id, p.name, p.price, p.stock, p.category_id,
+			c.id AS category_id_from_join,
+			c.name AS category_name,
+			c.description AS category_description   -- kalau ada field description
 		FROM products p
 		LEFT JOIN categories c ON p.category_id = c.id
 		WHERE p.id = $1
 	`
 
 	var p models.Product
-	var categoryName sql.NullString
+	var catID int
+	var catName sql.NullString
+	var catDesc sql.NullString
 
 	err := repo.db.QueryRow(query, id).Scan(
-		&p.ID, &p.Name, &p.Price, &p.Stock, &categoryName,
+		&p.ID,
+		&p.Name,
+		&p.Price,
+		&p.Stock,
+		&p.CategoryID,
+		&catID,
+		&catName,
+		&catDesc,
 	)
 
 	if err == sql.ErrNoRows {
@@ -66,8 +77,12 @@ func (repo *ProductRepository) GetByID(id int) (*models.Product, error) {
 		return nil, err
 	}
 
-	if categoryName.Valid {
-		p.Category = {Name: categoryName.String}
+	if catName.Valid {
+		p.Category = &models.Category{
+			ID:          catID,
+			Name:        catName.String,
+			Description: catDesc.String,
+		}
 	}
 
 	return &p, nil
