@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"fmt"
+	"time"
 	"database/sql"
 	"categories-api/models"
 )
@@ -76,4 +77,77 @@ func (repo *TransactionRepository) CreateTransaction(items []models.CheckoutItem
 		TotalAmount: totalAmount,
 		Details:     details,
 	}, nil
+}
+
+func (repo *TransactionRepository) GetTodayReport() (models.TodayReport, error) {
+    today := time.Now().Truncate(24 * time.Hour) // mulai dari 00:00 hari ini
+    tomorrow := today.Add(24 * time.Hour)
+
+    var report models.TodayReport
+
+    // 1. Total amount & jumlah transaksi
+    err := repo.db.QueryRow(`
+        SELECT 
+            COALESCE(SUM(total_amount), 0) AS total_revenue,
+            COUNT(*) AS transaction_count
+        FROM transactions
+        WHERE created_at >= $1 AND created_at < $2
+    `, today, tomorrow).Scan(
+        &report.TotalRevenue,
+        &report.TransactionCount,
+    )
+    if err != nil {
+        return models.TodayReport{}, err
+    }
+
+    // 2. Total item terjual
+    err = repo.db.QueryRow(`
+        SELECT COALESCE(SUM(quantity), 0) AS total_items_sold
+        FROM transaction_details td
+        JOIN transactions t ON td.transaction_id = t.id
+        WHERE t.created_at >= $1 AND t.created_at < $2
+    `, today, tomorrow).Scan(&report.TotalItemsSold)
+    if err != nil {
+        return models.TodayReport{}, err
+    }
+
+    // 3. Daftar transaksi hari ini (ringkas)
+    rows, err := repo.db.Query(`
+        SELECT 
+            t.id,
+            t.total_amount,
+            t.created_at,
+            COUNT(td.id) AS item_count
+        FROM transactions t
+        LEFT JOIN transaction_details td ON t.id = td.transaction_id
+        WHERE t.created_at >= $1 AND t.created_at < $2
+        GROUP BY t.id, t.total_amount, t.created_at
+        ORDER BY t.created_at DESC
+        LIMIT 50
+    `, today, tomorrow)
+    if err != nil {
+        return models.TodayReport{}, err
+    }
+    defer rows.Close()
+
+    report.Transactions = make([]models.TodayTransactionSummary, 0)
+    for rows.Next() {
+        var tx models.TodayTransactionSummary
+        err := rows.Scan(
+            &tx.ID,
+            &tx.TotalAmount,
+            &tx.CreatedAt,
+            &tx.ItemCount,
+        )
+        if err != nil {
+            return models.TodayReport{}, err
+        }
+        report.Transactions = append(report.Transactions, tx)
+    }
+
+    if err = rows.Err(); err != nil {
+        return models.TodayReport{}, err
+    }
+
+    return report, nil
 }
