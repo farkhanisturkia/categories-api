@@ -27,15 +27,16 @@ type CheckoutRequest struct {
 	Items   []CheckoutItem `json:"items"`
 }
 
-type TodayReport struct {
-    Date             string                      `json:"date"` // "2026-02-09"
-    TotalRevenue     int                         `json:"total_revenue"`
-    TransactionCount int                         `json:"transaction_count"`
-    TotalItemsSold   int                         `json:"total_items_sold"`
-    Transactions     []TodayTransactionSummary   `json:"transactions"`
+type Report struct {
+    StartDate        string                    `json:"start_date"`
+    EndDate          string                    `json:"end_date"`
+    TotalRevenue     int                       `json:"total_revenue"`
+    TransactionCount int                       `json:"transaction_count"`
+    TotalItemsSold   int                       `json:"total_items_sold"`
+    Transactions     []ReportTransactionSummary `json:"transactions,omitempty"`
 }
 
-type TodayTransactionSummary struct {
+type ReportTransactionSummary struct {
     ID          int       `json:"id"`
     TotalAmount int       `json:"total_amount"`
     CreatedAt   time.Time `json:"created_at"`

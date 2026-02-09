@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"categories-api/services"
 	"categories-api/models"
@@ -45,20 +46,79 @@ func (h *TransactionHandler) Checkout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TransactionHandler) HandleReport(w http.ResponseWriter, r *http.Request) {
-    switch r.Method {
-    case http.MethodGet:
-		h.GetTodayReport(w, r)
-    default:
+    if r.Method != http.MethodGet {
         http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+        return
     }
+
+    if r.URL.Path == "/api/report/hari-ini" {
+        h.GetTodayReport(w, r)
+        return
+    }
+
+    // Default
+    h.GetRangeReport(w, r)
 }
 
 func (h *TransactionHandler) GetTodayReport(w http.ResponseWriter, r *http.Request) {
-    report, err := h.service.GetTodayReport()
+    today := time.Now().Truncate(24 * time.Hour)
+    start := today
+    end := today.Add(24 * time.Hour)
+
+    report, err := h.service.GetReport(start, end)
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return
     }
+
+    // Override
+    report.StartDate = today.Format("2006-01-02")
+    report.EndDate = today.Format("2006-01-02")
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(report)
+}
+
+func (h *TransactionHandler) GetRangeReport(w http.ResponseWriter, r *http.Request) {
+    startDateStr := r.URL.Query().Get("start_date")
+    endDateStr := r.URL.Query().Get("end_date")
+
+    var start, end time.Time
+    var err error
+
+    if startDateStr == "" || endDateStr == "" {
+        today := time.Now().Truncate(24 * time.Hour)
+        start = today
+        end = today.Add(24 * time.Hour)
+    } else {
+        start, err = time.Parse("2006-01-02", startDateStr)
+        if err != nil {
+            http.Error(w, "format start_date salah (gunakan YYYY-MM-DD)", http.StatusBadRequest)
+            return
+        }
+
+        end, err = time.Parse("2006-01-02", endDateStr)
+        if err != nil {
+            http.Error(w, "format end_date salah (gunakan YYYY-MM-DD)", http.StatusBadRequest)
+            return
+        }
+
+        end = end.Add(24 * time.Hour)
+    }
+
+    if end.Before(start) {
+        http.Error(w, "end_date harus setelah atau sama dengan start_date", http.StatusBadRequest)
+        return
+    }
+
+    report, err := h.service.GetReport(start, end)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    report.StartDate = start.Format("2006-01-02")
+    report.EndDate = end.Add(-24 * time.Hour).Format("2006-01-02")
 
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(report)
