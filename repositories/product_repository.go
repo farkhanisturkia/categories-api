@@ -15,7 +15,7 @@ func NewProductRepository(db *sql.DB) *ProductRepository {
 }
 
 func (repo *ProductRepository) GetAll(nameFilter string) ([]models.Product, error) {
-	query := "SELECT id, name, price, stock FROM products"
+	query := "SELECT id, name, price, stock, category_id FROM products"
 	args := []interface{}{}
 	if nameFilter != "" {
 		query += " WHERE p.name ILIKE $1"
